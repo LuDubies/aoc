@@ -25,6 +25,7 @@ def scenic_score(x: int, y: int, tmap: np.array) -> int:
     lv = view_distance(tmap[x, y], np.flip(tmap[x, :y]))
     rv = view_distance(tmap[x, y], tmap[x, y+1:])
     # print(f"Scenic score of {x}, {y} is {tv} * {bv} * {lv} * {rv} = {tv * bv * lv * rv}.")
+    return tv * bv * lv * rv
 
 with open('input.txt', 'r') as inp:
     lines = inp.readlines()
