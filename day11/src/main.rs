@@ -50,17 +50,14 @@ impl <'a> Monkey<'a> {
         }
 
         if worry % self.test == 0 {
-            println!("Monkey {} threw {} to target {}", self.id, worry, self.targets.0);
             Some((worry, self.targets.0))
         } else {
-            println!("Monkey {} threw {} to target {}", self.id, worry, self.targets.1);
             Some((worry, self.targets.1))
         }
     }
 
     fn catch_item(&mut self, item: usize) -> ()  {
         self.items.push(item);
-        println!("Monkey {} caught {item}", self.id);
     }
 }
 
@@ -81,7 +78,7 @@ fn main() -> Result<()>{
         lcm = lcm * m.test;
     }
 
-    println!("{}", lcm);
+    println!("LCM of testers is {}", lcm);
     
     if WORRY_DECREASE{
         for _ in 0..20 {
@@ -101,7 +98,7 @@ fn main() -> Result<()>{
 
     let monkey_buisness: usize = inspection_counts[inspection_counts.len()-1] * inspection_counts[inspection_counts.len()-2];
     println!("{:?}", inspection_counts);
-    println!("{:?}", monkey_buisness);
+    println!("Monkey buisness is {:?}", monkey_buisness);
 
     Ok(())
 }
