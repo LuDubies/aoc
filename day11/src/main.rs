@@ -1,6 +1,8 @@
 use std::io::{Result, BufRead, BufReader};
 use std::fs::File;
 
+const WORRY_DECREASE: bool = false;
+
 #[derive(Debug)]
 struct Monkey<'a>{
     id: usize,
@@ -17,7 +19,7 @@ impl <'a> Monkey<'a> {
         Self {id, items, operation, test, targets, instpection_count: 0}
     }
 
-    fn process_item(&mut self) -> Option<(usize, usize)> {
+    fn process_item(&mut self, reducer: Option<usize>) -> Option<(usize, usize)> {
         if self.items.is_empty() {
             return None;
         }
@@ -38,7 +40,14 @@ impl <'a> Monkey<'a> {
             _ => panic!("Invalid operation for monkey {:?}", self.id),
         }
         self.instpection_count = self.instpection_count + 1;  // inc inspection count
-        worry = worry / 3;  // loose interest
+        if WORRY_DECREASE{
+            worry = worry / 3;  // loose interest
+        } else {
+            match reducer {
+                None => panic!("Need reducer if there is no worry decrease!"),
+                Some(r) => worry = worry % r,
+            }
+        }
 
         if worry % self.test == 0 {
             println!("Monkey {} threw {} to target {}", self.id, worry, self.targets.0);
@@ -65,11 +74,25 @@ fn main() -> Result<()>{
                     .collect();
     
     let mut monkeys = parse_monkeys(&lines);
-    for _ in 0..20 {
-        round(&mut monkeys);
+
+    // testers are all primes, so LCM is just all multiplied
+    let mut lcm = 1;
+    for m in &monkeys{
+        lcm = lcm * m.test;
+    }
+
+    println!("{}", lcm);
+    
+    if WORRY_DECREASE{
+        for _ in 0..20 {
+            round(&mut monkeys, None);
+        }
+    } else {
+        for _ in 0..10000 {
+            round(&mut monkeys, Some(lcm));
+        }
     }
     
-    println!("{:?}", monkeys);
 
     let mut inspection_counts: Vec<usize> = monkeys.iter()
                                             .map(|m| m.instpection_count)
@@ -83,10 +106,10 @@ fn main() -> Result<()>{
     Ok(())
 }
 
-fn round(monkeys: &mut Vec<Monkey>) -> () {
+fn round(monkeys: &mut Vec<Monkey>, reducer: Option<usize>) -> () {
     for i in 0..monkeys.len(){
         loop {
-            match monkeys[i].process_item() {
+            match monkeys[i].process_item(reducer) {
                 None => break,
                 Some(thrown_item) => {
                     let(item, target) = thrown_item;
