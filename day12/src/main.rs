@@ -27,6 +27,10 @@ impl Node {
     }
 }
 
+fn can_climb(from: usize, to: usize, nds: &Vec<Node>) -> bool {
+    nds[from].height as usize + 1 >= nds[to].height as usize
+}
+
 fn main() -> Result<()> {
     let file = File::open("input.txt")?;
     let reader = BufReader::new(file);
@@ -53,11 +57,20 @@ fn main() -> Result<()> {
 
     println!("Parsed {node_counter} nodes.");
 
+
     for id in 0..node_counter {
-        if id % grid_width != 0 && nodes[id].height < nodes[id-1].height { nodes[id].add_neighbour(id - 1); }
-        if id % grid_width != grid_width - 1 && nodes[id].height < nodes[id+1].height { nodes[id].add_neighbour(id + 1); }
-        if id + grid_width < node_counter  && nodes[id].height < nodes[id+grid_width].height { nodes[id].add_neighbour(id + grid_width); }
-        if id > grid_width && nodes[id].height < nodes[id-grid_width].height{ nodes[id].add_neighbour(id - grid_width); }
+        if id % grid_width != 0 && can_climb(id, id-1, &nodes) { 
+            nodes[id].add_neighbour(id - 1);
+         }
+        if id % grid_width != grid_width - 1 && can_climb(id, id+1, &nodes) { 
+            nodes[id].add_neighbour(id + 1);
+         }
+        if id + grid_width < node_counter  && can_climb(id, id + grid_width, &nodes) {
+             nodes[id].add_neighbour(id + grid_width);
+        }
+        if id > grid_width && can_climb(id, id - grid_width, &nodes){ 
+            nodes[id].add_neighbour(id - grid_width); 
+        }
     }
 
 
