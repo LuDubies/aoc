@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <windows.h>
 #include <Wincrypt.h>
 
 #define BUFSIZE 1024
@@ -17,7 +18,6 @@ int main(void) {
         return 1;
     }
 
-    char *linepart;
     char line[MAX_LINE_LENGTH];
     long search = 0;
 
@@ -31,19 +31,29 @@ int main(void) {
     HCRYPTHASH hHash = 0;
     char hexDigits[] = "0123456789abcdef";
 
-    unsigned char inputBuffer[BUFSIZE];
-    unsigned char hashBuffer[MD5LEN];
+    BYTE inputBuffer[BUFSIZE];
+    BYTE hashBuffer[MD5LEN];
     int inputSize = 0;
-    long result = 0;
+    long result5 = 0;
+    int result6 = 0;
 
     while (LONG_MAX >= search)
     {
-        /* prep buffer */
+        ++search;
 
+        /* prep buffer */
+        strcpy(inputBuffer, line);
+        int digits = sprintf(inputBuffer + strlen(line), "%d", search);
+        inputSize = strlen(line) + digits;
+
+        if (search % 10000 == 0)
+        {
+            printf("UPDATE: Search up to %d, with buffer %s of length %d.\n", search, inputBuffer, inputSize);
+        }
 
         /* calc MD5 */
         if (!CryptAcquireContext(&hProv, NULL, NULL, PROV_RSA_FULL,CRYPT_VERIFYCONTEXT))
-        {       
+        {
             printf("CryptAcquireContext failed!\n");
             return 1;
         }
@@ -54,39 +64,64 @@ int main(void) {
             return 1;
         }
 
-        if (!CryptHashData(hHash, inputBuffer, inputSize, 0)) /* never expect to hasm more than 1024 bytes s*/
+        if (!CryptHashData(hHash, inputBuffer, inputSize, 0)) /* never expect to hash more than 1024 bytes */
         {
             printf("Hashing failed!\n");
             return 1;
         }
 
-        int cbHash = MD5LEN;
+        DWORD cbHash = MD5LEN;
         if (!CryptGetHashParam(hHash, HP_HASHVAL, hashBuffer, &cbHash, 0))
         {
             printf("Retrieving hash result failed!\n");
             return 1;
         }
-        for (int i = 0; i < cbHash; i++)
-        {
-            printf("%c%c", hexDigits[hashBuffer[i] >> 4], hexDigits[hashBuffer[i] & 0xf]);
-        }
-        printf("\n");
 
         CryptReleaseContext(hProv, 0);
         CryptDestroyHash(hHash);
 
         /* check result */
+        if ((((hashBuffer[0] >> 4) & 0xf) == 0) &&
+            ((hashBuffer[0] & 0xf) == 0) &&
+            (((hashBuffer[1] >> 4) & 0xf) == 0) &&
+            ((hashBuffer[1] & 0xf) == 0) &&
+            (((hashBuffer[2] >> 4) & 0xf) == 0))
+        {
+            if (result5 == 0)
+            {
+                result5 = search;
+                printf("Found solution for 5 zeros:\n");
+                for (DWORD i = 0; i < cbHash; i++)
+                {
+                    printf("%c%c", hexDigits[hashBuffer[i] >> 4],hexDigits[hashBuffer[i] & 0xf]);
+                }
+                printf("\n");  
+            }
+
+            if ((hashBuffer[2] & 0xf) == 0)
+            {
+                result6 = search;
+                printf("Found solution for 6 zeros:\n");
+                for (DWORD i = 0; i < cbHash; i++)
+                {
+                    printf("%c%c", hexDigits[hashBuffer[i] >> 4],hexDigits[hashBuffer[i] & 0xf]);
+                }
+                printf("\n");
+                break;
+            }
+            
+        }
     }
 
-    
-
-    if (0 == result)
+    /* print results */
+    if (0 == result5)
     {
-        printf("ERROR: No result could be founcd!");
+        printf("ERROR: No result could be found!");
     }
     else
     {
-        printf("RESULT: The lowest number to get a qualified has is %d.", result);
+        printf("RESULT: The lowest number to result in a 5 zero hash is %d.\n", result5);
+        printf("RESULT: The lowest number to result in a 6 zero hash is %d.\n", result6);
     }
 
     fclose(fp);
