@@ -5,7 +5,7 @@
 #include <ctype.h>
 
 #define MAX_LINE_LENGTH 50  /* max input line size */
-#define MAX_ID_LEN 3        /* max register name length */
+#define MAX_ID_LEN 20       /* max register name length or length of constant*/
 #define HASH_TABLE_SIZE 701 /* cant hurt to use a prime (hopefully) */
 
 enum Operation
@@ -127,8 +127,8 @@ void parseInputLine(char *line)
     char *token;
     wire *pParsedWire;
     uint16_t signal = 0;
-    char op1buf[4];
-    char op2buf[4];
+    char op1buf[MAX_ID_LEN + 1];
+    char op2buf[MAX_ID_LEN + 1];
     enum Operation tmpOp;
 
     token = strtok(line, " ");
@@ -156,50 +156,101 @@ void parseInputLine(char *line)
 
         if (strcmp("->", token) == 0)
         {
-            /* parse immediate value for wire */
-            signal = atoi(op1buf);
+            /* parse immediate or direct */
+            token = strtok(NULL, "\n");
+            pParsedWire = insertWire(token);
+            pParsedWire->signal = signal;
+            pParsedWire->operation = IMM;
+            strcpy(pParsedWire->input1, op1buf);
+            pParsedWire->set = 0;
+        }
+        else
+        {
+            if (strcmp("AND", token) == 0)
+            {
+                tmpOp = AND;
+            }
+            else if (strcmp("OR", token) == 0)
+            {
+                tmpOp = OR;
+            }
+            else if (strcmp("LSHIFT", token) == 0)
+            {
+                tmpOp = LSHIFT;
+            }
+            else if (strcmp("RSHIFT", token) == 0)
+            {
+                tmpOp = RSHIFT;
+            }
+            else
+            {
+                printf("ERROR: Failed to parse operation token %s.", token);
+                return;
+            }
+
+            token = strtok(NULL, " ");
+            strcpy(op2buf, token);
+            token = strtok(NULL, " "); /* ignore -> */
             token = strtok(NULL, "\n");
 
             pParsedWire = insertWire(token);
             pParsedWire->signal = signal;
-            pParsedWire->operation = IMM;
-            pParsedWire->set = 1;
+            pParsedWire->operation = tmpOp;
+            strcpy(pParsedWire->input1, op1buf);
+            strcpy(pParsedWire->input2, op2buf);
+
+            pParsedWire->set = 0;
         }
-        else if (strcmp("AND", token) == 0)
+    }
+}
+
+uint8_t grabInput(uint16_t *operator, uint8_t inpIdx, wire *pTarget)
+{
+    if (inpIdx == 1)
+    {
+        if (isdigit(pTarget->input1[0]))
         {
-            tmpOp = AND;
-        }
-        else if (strcmp("OR", token) == 0)
-        {
-            tmpOp = OR;
-        }
-        else if (strcmp("LSHIFT", token) == 0)
-        {
-            tmpOp = LSHIFT;
-        }
-        else if (strcmp("RSHIFT", token) == 0)
-        {
-            tmpOp = RSHIFT;
+            *operator = atoi(pTarget->input1);
         }
         else
         {
-            printf("ERROR: Failed to parse operation token %s.", token);
-            return;
+            wire *pInput1 = getWire(pTarget->input1);
+            if (NULL == pInput1)
+            {
+                printf("ERROR: Unable to retrieve Input1 (%s) for wire %s.\n", pTarget->input1, pTarget->identifier);
+                return 0;
+            }
+            if (0 == pInput1->set)
+            {
+                return 0; /* cant compute from uncomputed value */
+            }
+            *operator = pInput1->signal;
         }
-
-        token = strtok(NULL, " ");
-        strcpy(op2buf, token);
-        token = strtok(NULL, " "); /* ignore -> */
-        token = strtok(NULL, "\n");
-
-        pParsedWire = insertWire(token);
-        pParsedWire->signal = signal;
-        pParsedWire->operation = tmpOp;
-        strcpy(pParsedWire->input1, op1buf);
-        strcpy(pParsedWire->input2, op2buf);
-
-        pParsedWire->set = 0;
     }
+    else
+    {
+        if (isdigit(pTarget->input2[0]))
+        {
+            *operator = atoi(pTarget->input2);
+        }
+        else
+        {
+            wire *pInput2 = getWire(pTarget->input2);
+
+            if (NULL == pInput2)
+            {
+                printf("ERROR: Unable to retrieve Input2 (%s) for wire %s.\n", pTarget->input1, pTarget->identifier);
+                return 0;
+            }
+            if (0 == pInput2->set)
+            {
+                return 0; /* cant compute from uncomputed value */
+            }
+            *operator = pInput2->signal;
+        }
+    }
+
+    return 1;
 }
 
 uint8_t computeSignal(char *ident)
@@ -211,57 +262,58 @@ uint8_t computeSignal(char *ident)
         return 1;
     }
 
-    /* need to get input 1 for all operations except IMM, which is alwys set */
-    wire *pInput1 = getWire(pTarget->input1);
-    if (NULL == pInput1)
+    uint16_t operator1;
+    uint16_t operator2;
+
+    /* need to get input 1 for all operations */
+    if (0 == grabInput(&operator1, 1, pTarget))
     {
-        printf("ERROR: Unable to retrieve Input1 (%s) for wire %s.\n", pTarget->input1, ident);
         return 0;
     }
-    if (0 == pInput1->set)
-    {
-        return 0; /* cant compute from uncomputed value */
-    }
 
-    if (NOT == pTarget->operation)
+    if (IMM == pTarget->operation)
     {
-        pTarget->signal = (~pInput1->signal) & 0xFFFF;
+        pTarget->signal = operator1;
         pTarget->set = 1;
+    }
+    else if (NOT == pTarget->operation)
+    {
+        pTarget->signal = (~operator1) & 0xFFFF;
+        pTarget->set = 1;
+        printf("DEBUG: Computed %s = %d from NOT %s = %d.\n", pTarget->identifier, pTarget->signal, pTarget->input1, operator1);
     }
     else if (RSHIFT == pTarget->operation)
     {
         uint8_t shiftamnt = (uint8_t)atoi(pTarget->input2);
-        pTarget->signal = (pInput1->signal >> shiftamnt) & 0xFFFF;
+        pTarget->signal = (operator1 >> shiftamnt) & 0xFFFF;
         pTarget->set = 1;
+        printf("DEBUG: Computed %s = %d from %s = %d >> %d.\n", pTarget->identifier, pTarget->signal, pTarget->input1, operator1, shiftamnt);
     }
     else if (LSHIFT == pTarget->operation)
     {
         uint8_t shiftamnt = (uint8_t)atoi(pTarget->input2);
-        pTarget->signal = (pInput1->signal << shiftamnt) & 0xFFFF;
+        pTarget->signal = (operator1 << shiftamnt) & 0xFFFF;
         pTarget->set = 1;
+        printf("DEBUG: Computed %s = %d from %s = %d << %d.\n", pTarget->identifier, pTarget->signal, pTarget->input1, operator1, shiftamnt);
     }
     else
     {
-        wire *pInput2 = getWire(pTarget->input2);
-        if (NULL == pInput2)
+        if (0 == grabInput(&operator2, 2, pTarget))
         {
-            printf("ERROR: Unable to retrieve Input2 (%s) for wire %s.\n", pTarget->input2, ident);
             return 0;
-        }
-        if (0 == pInput2->set)
-        {
-            return 0; /* cant compute from uncomputed value */
-        }
+        }        
 
         if (AND == pTarget->operation)
         {
-            pTarget->signal = (pInput1->signal & pInput2->signal) & 0xFFFF;
+            pTarget->signal = (operator1 & operator2) & 0xFFFF;
             pTarget->set = 1;
+            printf("DEBUG: Computed %s = %d from %s & %s = %d & %d.\n", pTarget->identifier, pTarget->signal, pTarget->input1, pTarget->input2, operator1, operator2);
         }
         else
         {
-            pTarget->signal = (pInput1->signal | pInput2->signal) & 0xFFFF;
+            pTarget->signal = (operator1 | operator2) & 0xFFFF;
             pTarget->set = 1;
+            printf("DEBUG: Computed %s = %d from %s | %s = %d | %d.\n", pTarget->identifier, pTarget->signal, pTarget->input1, pTarget->input2, operator1, operator2);
         }
     }
 
@@ -303,19 +355,44 @@ int main(void)
         parseInputLine(line);
     }
 
-    printTable();
-
     /* compute signals */
     uint16_t unsolved = 0xFFFF;
     uint16_t abortCntr = 0;
-    while (0 != unsolved && abortCntr < 100)
+    while (0 != unsolved && abortCntr < 200)
     {
         unsolved = computeSignalSweep();
         abortCntr += 1;
         printf("DEBUG: Have %d uncomputed signals after round %d.\n", unsolved, abortCntr);
     }
 
-    printTable();
+    printf("\nRESULT: Wire a has the signal %d after the first round.\n", getWire("a")->signal);
+    printf("\nRESETTING...\n");
+
+    uint16_t tmp = getWire("a")->signal;
+
+    for (uint16_t index = 0; index < HASH_TABLE_SIZE; index++)
+    {
+        if (NULL != wireTable[index])
+        {
+            wireTable[index]->set = 0;
+        }
+    }
+
+    wire * bWire = getWire("b");
+    bWire->signal = tmp;
+    bWire->set = 1;
+
+    /* compute signals ... again */
+    unsolved = 0xFFFF;
+    abortCntr = 0;
+    while (0 != unsolved && abortCntr < 200)
+    {
+        unsolved = computeSignalSweep();
+        abortCntr += 1;
+        printf("DEBUG: Have %d uncomputed signals after round %d.\n", unsolved, abortCntr);
+    }
+
+    printf("\nRESULT: Wire a has the signal %d after the second round.\n", getWire("a")->signal);
 
     fclose(fp);
     return 0;
