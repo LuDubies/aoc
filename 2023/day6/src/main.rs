@@ -46,8 +46,24 @@ fn main() {
                             .unwrap()
                             .chars()
                             .filter(|c| !c.is_whitespace())
-                            .collect()
-                            .
+                            .collect::<String>()
+                            .parse::<i64>()
+                            .unwrap();
+
+    let one_race_distance = lines.iter()
+                            .nth(1)
+                            .unwrap()
+                            .split(":")
+                            .nth(1)
+                            .unwrap()
+                            .chars()
+                            .filter(|c| !c.is_whitespace())
+                            .collect::<String>()
+                            .parse::<i64>()
+                            .unwrap();
+
+    // brute forcing for now, solving for zeros of quadratic would be clean
+    println!("Result for Part 2: {}", winning_options(one_race_time, one_race_distance));
 
 
 }
