@@ -3,7 +3,7 @@ use std::fs::File;
 use std::str::FromStr;
 use std::cmp::Ordering;
 
-const CARDTYPES: [char; 13] = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A'];
+const CARDTYPES: [char; 13] = ['J', '2', '3', '4', '5', '6', '7', '8', '9', 'T', 'Q', 'K', 'A'];
 
 fn main() {
     let file = File::open("input.txt").expect("No such file!");
@@ -56,15 +56,20 @@ impl Hand {
             (); // force map to be consumed, this is propably bad code.
         }
 
-        if counts.iter().any(|x| *x == 5) {
+        let jokers = counts[CARDTYPES.iter().position(|x| *x == 'J').unwrap()];
+
+        let max_same = counts[1..].iter().fold(0, |a, n| std::cmp::max(a, *n));
+
+        if max_same + jokers >= 5 {
             return HandType::FIVEKIND;
         }
 
-        if counts.iter().any(|x| *x == 4) {
+        if max_same + jokers == 4 {
             return HandType::FOURKIND;
         }
 
-        if counts.iter().any(|x| *x == 3) {
+        if max_same == 3 {
+            // if there were any Jokers and a Tripple, we already returned
             if counts.iter().any(|x| *x == 2) {
                 return HandType::FULLHOUSE;
             } else {
@@ -72,12 +77,30 @@ impl Hand {
             }
         }
 
-        if counts.iter().any(|x| *x == 2) {
-            if counts.iter().filter(|x| **x == 2).count() == 2 {
-                return HandType::TWOPAIR;
+        if max_same == 2 {
+            // can maybe build a full house, better options would already be taken
+            let pair_count = counts.iter().filter(|x| **x == 2).count();
+            if jokers == 1 {
+                if pair_count == 2 {
+                    return HandType::FULLHOUSE;
+                } else {
+                    return HandType::THREEKIND;
+                }
             } else {
-                return HandType::ONEPAIR;
-            }
+                if  pair_count == 2 {
+                    return HandType::TWOPAIR;
+                } else {
+                    return HandType::ONEPAIR;
+                }
+            }    
+        }
+
+        if jokers == 2 {
+            return HandType::THREEKIND;
+        }
+
+        if jokers == 1 {
+            return HandType:: ONEPAIR;
         }
 
         return HandType::HIGHCARD
