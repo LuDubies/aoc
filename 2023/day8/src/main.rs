@@ -13,22 +13,31 @@ fn main() {
     let states: Vec<State> = lines.map(|line| line.parse::<State>()).filter(|r| !r.is_err())
         .map(|r| r.unwrap()).collect();
 
-    let mut machine = StateMachine{
-        transition_count: 0,
-        current: states.iter().filter(|st| st.identifier == ['A', 'A', 'A']).last().unwrap().clone(),
-        states: states,
-    };
+    let start_states: Vec<State> = states.iter().filter(|st| st.is_start()).cloned().collect();
+    println!("Found {} start states.", start_states.len());
+
+    let mut machines: Vec<StateMachine> = start_states.iter().map(|ss| StateMachine{
+            transition_count: 0,
+            current: ss.clone(),
+            states: states.clone(),
+        })
+        .collect();
 
     let infinite_instructions = instructions.iter().cycle();
 
     for instr in infinite_instructions {
-        let stopped = machine.transition(instr);
+        let mut stopped = true;
+        for machine in machines.iter_mut() {
+            if !machine.transition(instr) {
+                stopped = false;
+            }
+        }
         if stopped {
             break;
         }
     }
 
-    println!("Total transitions needed: {}", &machine.transition_count);
+    println!("Total transitions needed: {}", &machines[0].transition_count);
     
 }
 
@@ -52,11 +61,7 @@ impl StateMachine {
         }
         self.transition_count += 1;
 
-        if self.current.identifier == ['Z', 'Z', 'Z'] {
-            return true;
-        } else {
-            return false;
-        }
+        return self.current.is_halt();
     }
 }
 
@@ -73,6 +78,15 @@ struct State {
     left: [char; 3],
 }
 
+impl State {
+    fn is_start(&self) -> bool {
+        return self.identifier[2] == 'A';
+    }
+
+    fn is_halt(&self) -> bool {
+        return self.identifier[2] == 'Z';
+    }
+}
 #[derive(Debug, PartialEq, Eq)]
 struct ParseStateError;
 impl FromStr for State {
