@@ -7,8 +7,6 @@
 
 using namespace std;
 
-typedef unsigned int uint128_t __attribute__((mode(TI)));
-
 /*
 * Zero all values in the vector from the given index to the end.
 * 
@@ -87,7 +85,6 @@ void max_joltage_12(vector<uint8_t>& bank, vector<uint8_t>& best_batteries)
 
 int main()
 {
-    // Read single line input.
     ifstream file("input.txt");
     string line;
 
