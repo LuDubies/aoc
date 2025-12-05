@@ -63,10 +63,10 @@ int main()
         }
 
         invalidIdSum += range_sum;
-        printf("found %u for %u, total %u.\n", range_count, range_sum, invalidIdSum);
+        printf("found %llu for %llu, total %llu.\n", range_count, range_sum, invalidIdSum);
     }
 
-    printf("Total sum of invalid ids: %u\n", invalidIdSum);
+    printf("Total sum of invalid ids: %llu\n", invalidIdSum);
 
     return 0;
 }
